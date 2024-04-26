@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"log/slog"
 	"muzz/store"
 	"muzz/user"
 	"net/http"
@@ -21,6 +22,11 @@ func main() {
 
 	if _, err := db.Exec(store.Schema); err != nil {
 		log.Fatal(err)
+	}
+
+	testUser := user.User{Name: "TestUser", Email: "testuser@gmail.com", Password: "password"}
+	if err := user.StoreUser(db, testUser); err != nil {
+		slog.Error("failed to create test user for application", slog.Any("error", err))
 	}
 
 	http.HandleFunc("/user/create", user.CreateUserHandler(db))

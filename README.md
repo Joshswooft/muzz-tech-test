@@ -2,9 +2,9 @@
 
 ## Pre-requisites
 
-Latest golang and docker installed.
-
-Using `Makefile` for executing commands.
+- Latest golang and docker installed.
+- `Makefile` for executing commands.
+- [`atlas`](https://atlasgo.io/getting-started/) for migrations
 
 ## Run application
 
