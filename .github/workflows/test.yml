@@ -1,0 +1,59 @@
+on: [push, pull_request]
+name: Test
+jobs:
+  test:
+    strategy:
+      matrix:
+        go-version: [1.21.x]
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Install make
+        run: sudo apt-get update && sudo apt-get install make -y
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Lint
+        run: make lint
+      
+      - name: Static analysis
+        uses: dominikh/staticcheck-action@v1.2.0
+        with:
+          version: "2022.1.1"
+          install-go: false
+          cache-key: ${{ matrix.go }}
+      - name: Test
+        run: make test
+
+  test-cache:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install make
+        run: sudo apt-get update && sudo apt-get install make -y
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.21.x
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          # In order:
+          # * Module download cache
+          # * Build cache (Linux)
+          # * Build cache (Mac)
+          # * Build cache (Windows)
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+            ~/Library/Caches/go-build
+            %LocalAppData%\go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: Test
+        run: make test
