@@ -33,3 +33,15 @@ Create a random user:
 ```bash
 curl -X POST "http://localhost:8080/user/create"
 ```
+
+Note: The main app will create 1 dummy user for you
+Log user into the application:
+```bash
+curl -X POST \
+  http://localhost:8080/login \
+  -H 'Content-Type: application/json' \
+  -d '{
+	"email": "testuser@gmail.com",
+	"password": "password"
+}'
+```

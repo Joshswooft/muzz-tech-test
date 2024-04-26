@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"muzz/login"
 	"muzz/store"
 	"muzz/user"
 	"net/http"
@@ -30,6 +31,7 @@ func main() {
 	}
 
 	http.HandleFunc("/user/create", user.CreateUserHandler(db))
+	http.HandleFunc("/login", login.LoginHandler(db))
 	fmt.Println("Server is listening on port 8080...")
 	http.ListenAndServe(":8080", nil)
 }
