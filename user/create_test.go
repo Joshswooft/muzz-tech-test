@@ -1,8 +1,9 @@
-package main
+package user
 
 import (
 	"database/sql"
 	"encoding/json"
+	"muzz/store"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -19,7 +20,7 @@ func TestCreateUserHandler(t *testing.T) {
 	defer db.Close()
 	defer os.Remove("./test.db")
 
-	if _, err := db.Exec(schema); err != nil {
+	if _, err := db.Exec(store.Schema); err != nil {
 		t.Fatal(err)
 	}
 
@@ -29,8 +30,7 @@ func TestCreateUserHandler(t *testing.T) {
 	}
 
 	rr := httptest.NewRecorder()
-	userHandler := handler{db: db}
-	handler := http.HandlerFunc(userHandler.createUserHandler)
+	handler := http.HandlerFunc(CreateUserHandler(db))
 
 	handler.ServeHTTP(rr, req)
 
@@ -58,8 +58,4 @@ func TestCreateUserHandler(t *testing.T) {
 		response.Result.Age == 0 {
 		t.Errorf("handler returned incomplete user data: %v", response)
 	}
-}
-
-func TestMain(m *testing.M) {
-	os.Exit(m.Run())
 }
