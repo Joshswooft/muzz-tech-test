@@ -1,7 +1,7 @@
 mod: go mod download
 
 test:
-	go test -race ./...
+	go test -tags=embed -race ./...
 
 lint:
 	go vet ./...
@@ -13,4 +13,4 @@ build:
 # database to the state described in the provided Atlas schema. Before running the
 # migration, Atlas will print the migration plan and prompt the user for approval.
 migrate:
-	atlas schema apply --url="sqlite://muzz.db" --dev-url="sqlite://file?mode=memory" --to="file://schema.sql"
+	atlas schema apply --url="sqlite://muzz.db" --dev-url="sqlite://file?mode=memory" --to="file://store/schema.sql"

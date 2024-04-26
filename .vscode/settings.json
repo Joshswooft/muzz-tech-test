@@ -1,0 +1,7 @@
+{
+    "go.testFlags": [
+        "-race",
+        "-tags",
+        "embed"
+    ]
+}

@@ -20,7 +20,7 @@ func TestCreateUserHandler(t *testing.T) {
 	defer db.Close()
 	defer os.Remove("./test.db")
 
-	if _, err := db.Exec(store.Schema); err != nil {
+	if _, err := db.Exec(store.SchemaSQL); err != nil {
 		t.Fatal(err)
 	}
 

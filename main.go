@@ -20,7 +20,7 @@ func main() {
 	}
 	defer db.Close()
 
-	if _, err := db.Exec(store.Schema); err != nil {
+	if _, err := db.Exec(store.SchemaSQL); err != nil {
 		log.Fatal(err)
 	}
 
