@@ -14,6 +14,28 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+type WrappedWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+// Implement the http.ResponseWriter interface
+func (w *WrappedWriter) WriteHeader(statusCode int) {
+	w.ResponseWriter.WriteHeader(statusCode)
+	w.statusCode = statusCode
+}
+
+func logger(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+
+		wrapped := &WrappedWriter{statusCode: http.StatusOK, ResponseWriter: w}
+
+		next.ServeHTTP(wrapped, r)
+		slog.Info("request", slog.Int("code", wrapped.statusCode), slog.String("method", r.Method), slog.String("path", r.URL.Path), slog.Int64("durationMS", time.Since(start).Milliseconds()))
+	})
+}
+
 func main() {
 
 	db, err := sql.Open("sqlite3", "./muzz.db")
@@ -39,7 +61,7 @@ func main() {
 
 	server := http.Server{
 		Addr:         ":8080",
-		Handler:      router,
+		Handler:      logger(router),
 		WriteTimeout: time.Second * 10,
 		ReadTimeout:  time.Second * 10,
 	}
