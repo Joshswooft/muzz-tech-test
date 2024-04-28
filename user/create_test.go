@@ -33,10 +33,11 @@ func TestCreateUserHandler(t *testing.T) {
 	handler := http.HandlerFunc(CreateUserHandler(db))
 
 	handler.ServeHTTP(rr, req)
+	wantStatus := http.StatusCreated
 
-	if status := rr.Code; status != http.StatusOK {
+	if status := rr.Code; status != wantStatus {
 		t.Errorf("handler returned wrong status code: got %v want %v",
-			status, http.StatusOK)
+			status, wantStatus)
 	}
 
 	expectedContentType := "application/json"
