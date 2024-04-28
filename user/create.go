@@ -37,18 +37,34 @@ type CreateUserResponse struct {
 	Result createUserResult `json:"result"`
 }
 
+type CreateUserHandlerDeps struct {
+	// db to save the user to
+	DB *sql.DB
+
+	// for managing the time yourself - in most cases you wont need to use this
+	Clock func() time.Time
+}
+
+// now is a time generator that falls back to std lib if clock is not specified
+func (c *CreateUserHandlerDeps) now() time.Time {
+	if c.Clock == nil {
+		return time.Now()
+	}
+	return c.Clock()
+}
+
 // Creates a random user
-func CreateUserHandler(db *sql.DB) http.HandlerFunc {
+func CreateUserHandler(deps CreateUserHandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		randomUser := generateRandomUser()
-		err := StoreUser(db, randomUser)
+		err := StoreUser(deps.DB, randomUser)
 		if err != nil {
 			slog.Error("failed to create user", slog.Any("error", err))
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		createUserResult, err := convertToCreateUserResult(randomUser)
+		createUserResult, err := convertToCreateUserResult(randomUser, deps.now())
 
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -68,8 +84,8 @@ func CreateUserHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-func convertToCreateUserResult(user User) (createUserResult, error) {
-	age, err := calculateAge(user.DOB)
+func convertToCreateUserResult(user User, now time.Time) (createUserResult, error) {
+	age, err := CalculateAge(user.DOB, now)
 
 	if err != nil {
 		return createUserResult{}, err
@@ -86,13 +102,13 @@ func convertToCreateUserResult(user User) (createUserResult, error) {
 }
 
 // calculates age from a dob
-func calculateAge(dob string) (int, error) {
+func CalculateAge(dob string, now time.Time) (int, error) {
 	layout := "2006-01-02"
 	t, err := time.Parse(layout, dob)
 	if err != nil {
 		return 0, err
 	}
-	age := time.Since(t).Hours() / 24 / 365
+	age := now.Sub(t).Hours() / 24 / 365
 	return int(age), nil
 }
 
@@ -110,6 +126,10 @@ func generateRandomUser() User {
 
 // Stores a user in the sqlite db
 func StoreUser(db *sql.DB, user User) error {
+
+	if db == nil {
+		return fmt.Errorf("no database provided")
+	}
 
 	// bcrypt salts the password for us
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)

@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
-	"muzz/login"
+	"muzz/auth"
+	"muzz/matchmaker"
 	"muzz/middleware"
 	"muzz/store"
 	"muzz/user"
@@ -32,11 +33,19 @@ func main() {
 		slog.Error("failed to create test user for application", slog.Any("error", err))
 	}
 
+	tokenAuth := auth.NewTokenAuthenticator()
+	authGuardMiddleware := middleware.NewAuthGuardMiddleware(tokenAuth.ExtractClaimsFromToken)
+
 	router := http.NewServeMux()
 
-	// Define endpoints
-	router.HandleFunc("POST /user/create", user.CreateUserHandler(db))
-	router.HandleFunc("POST /login", login.LoginHandler(db))
+	// Define auth endpoints
+	authRouter := http.NewServeMux()
+	authRouter.HandleFunc("POST /user/create", user.CreateUserHandler(user.CreateUserHandlerDeps{DB: db}))
+	authRouter.HandleFunc("GET /discover", matchmaker.DiscoverHandler(matchmaker.DiscoverHandlerDeps{DB: db}))
+	router.Handle("/", authGuardMiddleware(authRouter))
+
+	// Define un-authenticated endpoints
+	router.HandleFunc("POST /login", auth.LoginHandler(auth.LoginHandlerDeps{DB: db, JwtTokenGenerator: tokenAuth.GenerateJWTToken}))
 
 	server := http.Server{
 		Addr:         ":8080",

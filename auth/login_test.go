@@ -1,4 +1,4 @@
-package login
+package auth
 
 import (
 	"bytes"
@@ -11,9 +11,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestLoginHandler(t *testing.T) {
@@ -53,7 +52,7 @@ func TestLoginHandler(t *testing.T) {
 	}
 	req.Body = io.NopCloser(bytes.NewReader(reqBody))
 
-	handler := http.HandlerFunc(LoginHandler(db))
+	handler := http.HandlerFunc(LoginHandler(LoginHandlerDeps{DB: db, JwtTokenGenerator: NewTokenAuthenticator().GenerateJWTToken}))
 
 	handler.ServeHTTP(rr, req)
 
