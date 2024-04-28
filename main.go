@@ -9,6 +9,7 @@ import (
 	"muzz/store"
 	"muzz/user"
 	"net/http"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -30,8 +31,19 @@ func main() {
 		slog.Error("failed to create test user for application", slog.Any("error", err))
 	}
 
-	http.HandleFunc("/user/create", user.CreateUserHandler(db))
-	http.HandleFunc("/login", login.LoginHandler(db))
+	router := http.NewServeMux()
+
+	// Define endpoints
+	router.HandleFunc("POST /user/create", user.CreateUserHandler(db))
+	router.HandleFunc("POST /login", login.LoginHandler(db))
+
+	server := http.Server{
+		Addr:         ":8080",
+		Handler:      router,
+		WriteTimeout: time.Second * 10,
+		ReadTimeout:  time.Second * 10,
+	}
+
 	fmt.Println("Server is listening on port 8080...")
-	http.ListenAndServe(":8080", nil)
+	server.ListenAndServe()
 }

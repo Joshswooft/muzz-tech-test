@@ -1,6 +1,6 @@
 module muzz
 
-go 1.21.7
+go 1.22.2
 
 require (
 	github.com/go-faker/faker/v4 v4.4.1

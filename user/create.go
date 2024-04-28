@@ -22,8 +22,8 @@ type User struct {
 	DOB      string `json:"date_of_birth"`
 }
 
-// UserResponse is the data returned to the client
-type UserResponse struct {
+// createUserResult is the data returned to the client upon successful creation of the user
+type createUserResult struct {
 	ID       int    `json:"id"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
@@ -34,7 +34,7 @@ type UserResponse struct {
 
 // CreateUserResponse is the data returned to the client when creating a new user
 type CreateUserResponse struct {
-	Result UserResponse `json:"result"`
+	Result createUserResult `json:"result"`
 }
 
 // Creates a random user
@@ -48,13 +48,13 @@ func CreateUserHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		userResponse, err := convertToUserResponse(randomUser)
+		createUserResult, err := convertToCreateUserResult(randomUser)
 
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 
-		response := CreateUserResponse{Result: userResponse}
+		response := CreateUserResponse{Result: createUserResult}
 
 		jsonResponse, err := json.Marshal(response)
 		if err != nil {
@@ -68,14 +68,14 @@ func CreateUserHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-func convertToUserResponse(user User) (UserResponse, error) {
+func convertToCreateUserResult(user User) (createUserResult, error) {
 	age, err := calculateAge(user.DOB)
 
 	if err != nil {
-		return UserResponse{}, err
+		return createUserResult{}, err
 	}
 
-	return UserResponse{
+	return createUserResult{
 		ID:       user.ID,
 		Email:    user.Email,
 		Password: user.Password,
