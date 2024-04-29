@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"muzz/httpresponse"
 	"net/http"
 	"time"
 
@@ -42,6 +43,7 @@ type CreateUserHandlerDeps struct {
 	DB *sql.DB
 
 	// for managing the time yourself - in most cases you wont need to use this
+	// mainly for testing
 	Clock func() time.Time
 }
 
@@ -56,31 +58,27 @@ func (c *CreateUserHandlerDeps) now() time.Time {
 // Creates a random user
 func CreateUserHandler(deps CreateUserHandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		randomUser := generateRandomUser()
 		err := StoreUser(deps.DB, randomUser)
 		if err != nil {
 			slog.Error("failed to create user", slog.Any("error", err))
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(httpresponse.ErrorResponse{Error: "failed to create user"})
 			return
 		}
 
 		createUserResult, err := convertToCreateUserResult(randomUser, deps.now())
 
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(httpresponse.ErrorResponse{Error: "failed to create user"})
 		}
 
 		response := CreateUserResponse{Result: createUserResult}
 
-		jsonResponse, err := json.Marshal(response)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		w.Write(jsonResponse)
+		json.NewEncoder(w).Encode(response)
 	}
 }
 
