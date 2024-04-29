@@ -42,6 +42,7 @@ func main() {
 	authRouter := http.NewServeMux()
 	authRouter.HandleFunc("POST /user/create", user.CreateUserHandler(user.CreateUserHandlerDeps{DB: db}))
 	authRouter.HandleFunc("GET /discover", matchmaker.DiscoverHandler(matchmaker.DiscoverHandlerDeps{DB: db}))
+	authRouter.HandleFunc("POST /swipe", matchmaker.SwipeHandler(matchmaker.SwipeHandlerDeps{DB: db}))
 	router.Handle("/", authGuardMiddleware(authRouter))
 
 	// Define un-authenticated endpoints
