@@ -7,6 +7,7 @@ import (
 	"muzz/middleware"
 	"muzz/user"
 	"net/http"
+	"strconv"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -50,34 +51,79 @@ func DiscoverHandler(deps DiscoverHandlerDeps) http.HandlerFunc {
 
 		userID := claims.UserID
 
-		userProfiles, err := getPotentialMatches(deps.DB, userID, deps.now())
+		ageFilterStr := r.URL.Query().Get("age")
+		genderFilter := r.URL.Query().Get("gender")
+
+		var ageFilter int
+		var err error
+
+		if ageFilterStr != "" {
+			ageFilter, err = strconv.Atoi(ageFilterStr)
+
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(httpresponse.ErrorResponse{Error: "Age filter must be a number"})
+				return
+			}
+
+			if ageFilter < 0 {
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(httpresponse.ErrorResponse{Error: "Age filter must be more than 0"})
+			}
+		}
+
+		userProfiles, err := getPotentialMatches(deps.DB, userID, deps.now(), filters{age: ageFilter, gender: genderFilter})
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(httpresponse.ErrorResponse{Error: "failed to get matches"})
 			return
 		}
 
-		// Construct response
 		response := DiscoverResponse{Results: userProfiles}
-
-		// Encode response as JSON
 		json.NewEncoder(w).Encode(response)
 	}
 }
 
+type filters struct {
+	age    int
+	gender string
+}
+
 // Retrieve userProfiles from the database excluding the current user and the profiles the user has already swiped on
 // Assumes all the profiles will fit in memory!
-func getPotentialMatches(db *sql.DB, userID int, now time.Time) ([]profile, error) {
-	rows, err := db.Query("SELECT id, name, gender, dob FROM users WHERE id NOT IN (SELECT swipe_target FROM swipes WHERE swiper = ?) AND id != ?", userID, userID)
+func getPotentialMatches(db *sql.DB, userID int, now time.Time, filters filters) ([]profile, error) {
+
+	// assumes we only care about the year of the date of birth for simplicity
+	query := `
+	SELECT 
+	id, name, gender, dob, strftime('%Y', date('now')) - strftime('%Y', date(dob)) AS age 
+	FROM users 
+	WHERE id NOT IN (SELECT swipe_target FROM swipes WHERE swiper = ?) AND id != ?`
+
+	params := []interface{}{userID, userID}
+
+	if filters.age != 0 {
+		query += " AND age = ?"
+		params = append(params, filters.age)
+	}
+
+	if filters.gender != "" {
+		query += " AND gender = ?"
+		params = append(params, filters.gender)
+	}
+
+	rows, err := db.Query(query, params...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
 	var userProfiles []profile
+
 	for rows.Next() {
 		var u user.User
-		if err := rows.Scan(&u.ID, &u.Name, &u.Gender, &u.DOB); err != nil {
+		var age int
+		if err := rows.Scan(&u.ID, &u.Name, &u.Gender, &u.DOB, &age); err != nil {
 			return nil, err
 		}
 
