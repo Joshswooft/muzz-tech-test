@@ -4,7 +4,9 @@ CREATE TABLE IF NOT EXISTS users (
 	password TEXT,
 	name TEXT,
 	gender TEXT,
-	dob TEXT
+	dob TEXT,
+	lat REAL NULL,
+	lng REAL NULL
 );
 
 -- stores the user's swipes

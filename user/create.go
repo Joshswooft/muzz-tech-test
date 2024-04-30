@@ -15,12 +15,18 @@ import (
 
 // User represents the data stored in the user table
 type User struct {
-	ID       int    `json:"id"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	Name     string `json:"name"`
-	Gender   string `json:"gender"`
-	DOB      string `json:"date_of_birth"`
+	ID       int
+	Email    string
+	Password string
+	Name     string
+	Gender   string
+	DOB      string
+	Location GeoLocation
+}
+
+type GeoLocation struct {
+	Lat  sql.NullFloat64
+	Long sql.NullFloat64
 }
 
 // createUserResult is the data returned to the client upon successful creation of the user
@@ -117,6 +123,10 @@ func generateRandomUser() User {
 		Name:     faker.Name(),
 		Gender:   faker.Gender(),
 		DOB:      faker.Date(),
+		Location: GeoLocation{
+			Lat:  sql.NullFloat64{Float64: faker.Latitude(), Valid: true},
+			Long: sql.NullFloat64{Float64: faker.Longitude(), Valid: true},
+		},
 	}
 
 	return user
@@ -135,7 +145,7 @@ func StoreUser(db *sql.DB, user User) error {
 		return fmt.Errorf("failed to save user, password couldnt be salted %w", err)
 	}
 
-	_, err = db.Exec("INSERT INTO users (email, password, name, gender, dob) VALUES (?, ?, ?, ?, ?)", user.Email, hashedPassword, user.Name, user.Gender, user.DOB)
+	_, err = db.Exec("INSERT INTO users (email, password, name, gender, dob, lat, lng) VALUES (?, ?, ?, ?, ?, ?, ?)", user.Email, hashedPassword, user.Name, user.Gender, user.DOB, user.Location.Lat, user.Location.Long)
 
 	if err != nil {
 		return err

@@ -78,6 +78,68 @@ func TestDiscoverHandler(t *testing.T) {
 
 }
 
+func TestDiscoverHandlerSortByDistance(t *testing.T) {
+	db, err := sql.Open("sqlite3", "./test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	defer os.Remove("./test.db")
+
+	if _, err := db.Exec(store.SchemaSQL); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := db.Exec(`
+	INSERT INTO users (name, gender, dob, lat, lng) VALUES
+    ('John Doe', 'male', '1990-05-15', 40.7128, -74.0060),
+    ('Jane Smith', 'female', '1992-08-20', NULL, NULL),
+    ('Alice Johnson', 'female', '1985-12-10', 51.5074, -0.1278),
+    ('Bob Williams', 'male', '1988-03-25', 48.8566, 2.3522);
+	`); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := middleware.SetClaimsOnContext(context.Background(), auth.JWTClaims{UserID: 1})
+	now := time.Date(2024, 04, 01, 0, 0, 0, 0, time.Local)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", "/discover", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(DiscoverHandler(DiscoverHandlerDeps{clock: func() time.Time { return now }, DB: db}))
+	handler.ServeHTTP(rr, req)
+
+	wantStatusCode := http.StatusOK
+	if rr.Code != wantStatusCode {
+		t.Fatalf("Expected status code %d, got %d", wantStatusCode, rr.Code)
+	}
+
+	var response DiscoverResponse
+	if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedUserProfiles := []profile{
+		{ID: 2, Name: "Jane Smith", Gender: "female", Age: 31, DistanceFromMe: 0},
+		{ID: 3, Name: "Alice Johnson", Gender: "female", Age: 38},
+		{ID: 4, Name: "Bob Williams", Gender: "male", Age: 36, DistanceFromMe: 5837.24090382583},
+	}
+
+	if len(response.Results) != len(expectedUserProfiles) {
+		t.Errorf("Expected %d users, got %d", len(expectedUserProfiles), len(response.Results))
+	}
+	for i, expected := range expectedUserProfiles {
+		if response.Results[i].ID != expected.ID || response.Results[i].Name != expected.Name ||
+			response.Results[i].Gender != expected.Gender || response.Results[i].Age != expected.Age {
+			t.Errorf("Unexpected user profile. Expected: %+v, Got: %+v", expected, response.Results[i])
+		}
+	}
+
+}
+
 func TestDiscoverHandlerFilters(t *testing.T) {
 	db, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
