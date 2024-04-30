@@ -9,6 +9,7 @@ import (
 	"muzz/store"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -16,11 +17,12 @@ import (
 )
 
 func TestDiscoverHandler(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite3", "./discover-test.db")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
+	defer os.Remove("./discover-test.db")
 
 	if _, err := db.Exec(store.SchemaSQL); err != nil {
 		t.Fatal(err)
@@ -30,7 +32,10 @@ func TestDiscoverHandler(t *testing.T) {
 	INSERT INTO users (name, gender, dob) VALUES
 	('Alice', 'female', '1990-01-01'),
 	('Bob', 'male', '1985-01-01'),
-	('Charlie', 'male', '1995-01-01');
+	('Charlie', 'male', '1995-01-01'),
+	('Darren', 'male', '2000-05-04');
+
+	INSERT INTO swipes (swiper, swipe_target, liked) VALUES (1, 2, TRUE);
 	`); err != nil {
 		t.Fatal(err)
 	}
@@ -57,8 +62,8 @@ func TestDiscoverHandler(t *testing.T) {
 	}
 
 	expectedUserProfiles := []profile{
-		{ID: 2, Name: "Bob", Gender: "male", Age: 39},
 		{ID: 3, Name: "Charlie", Gender: "male", Age: 29},
+		{ID: 4, Name: "Darren", Gender: "male", Age: 23},
 	}
 
 	if len(response.Results) != len(expectedUserProfiles) {

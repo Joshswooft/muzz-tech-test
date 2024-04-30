@@ -36,7 +36,7 @@ func (c *DiscoverHandlerDeps) now() time.Time {
 	return c.clock()
 }
 
-// handler for getting all the potential matches for a given user
+// handler for getting all the potential matches for a given user excluding profiles who the user has already swiped for
 func DiscoverHandler(deps DiscoverHandlerDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -50,7 +50,7 @@ func DiscoverHandler(deps DiscoverHandlerDeps) http.HandlerFunc {
 
 		userID := claims.UserID
 
-		userProfiles, err := getMatchedUsers(deps.DB, userID, deps.now())
+		userProfiles, err := getPotentialMatches(deps.DB, userID, deps.now())
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(httpresponse.ErrorResponse{Error: "failed to get matches"})
@@ -65,10 +65,10 @@ func DiscoverHandler(deps DiscoverHandlerDeps) http.HandlerFunc {
 	}
 }
 
-// Retrieve userProfiles from the database excluding the current user
+// Retrieve userProfiles from the database excluding the current user and the profiles the user has already swiped on
 // Assumes all the profiles will fit in memory!
-func getMatchedUsers(db *sql.DB, userID int, now time.Time) ([]profile, error) {
-	rows, err := db.Query("SELECT id, name, gender, dob FROM users WHERE id != ?", userID)
+func getPotentialMatches(db *sql.DB, userID int, now time.Time) ([]profile, error) {
+	rows, err := db.Query("SELECT id, name, gender, dob FROM users WHERE id NOT IN (SELECT swipe_target FROM swipes WHERE swiper = ?) AND id != ?", userID, userID)
 	if err != nil {
 		return nil, err
 	}
