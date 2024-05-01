@@ -128,7 +128,9 @@ func getUserLocation(db *sql.DB, userID int) (*user.GeoLocation, error) {
 
 // Retrieve userProfiles from the database excluding the current user and the profiles the user has already swiped on
 // Assumes all the profiles will fit in memory!
-func getPotentialMatches(db *sql.DB, userID int, now time.Time, filters filters, userLocation user.GeoLocation) ([]*profile, error) {
+func getPotentialMatches(db *sql.DB, userID int, now time.Time, filters filters, userLocation user.GeoLocation) (userProfiles []*profile, err error) {
+
+	userProfiles = []*profile{}
 
 	// assumes we only care about the year of the date of birth for simplicity
 	query := `
@@ -155,11 +157,10 @@ func getPotentialMatches(db *sql.DB, userID int, now time.Time, filters filters,
 
 	rows, err := db.Query(query, params...)
 	if err != nil {
-		return nil, err
+		return
 	}
 	defer rows.Close()
 
-	var userProfiles []*profile
 	var minDistanceFromMe, maxDistanceFromMe float64
 	var minTotalLikes, maxTotalLikes int
 
@@ -167,7 +168,7 @@ func getPotentialMatches(db *sql.DB, userID int, now time.Time, filters filters,
 		var u user.User
 		var age, totalLikes int
 		if err := rows.Scan(&u.ID, &u.Name, &u.Gender, &u.DOB, &age, &u.Location.Lat, &u.Location.Long, &totalLikes); err != nil {
-			return nil, err
+			return userProfiles, err
 		}
 
 		age, err := user.CalculateAge(u.DOB, now)

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/stretchr/testify/assert"
 )
 
 func assertEqualProfiles(t *testing.T, expectedProfiles []*profile, profiles []*profile) bool {
@@ -335,11 +336,13 @@ func TestDiscoverHandlerNoProfiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedUserProfiles := []profile{}
+	expectedUserProfiles := []*profile{}
 
 	if len(response.Results) != len(expectedUserProfiles) {
 		t.Errorf("Expected %d users, got %d", len(expectedUserProfiles), len(response.Results))
 	}
+
+	assert.Equal(t, expectedUserProfiles, response.Results)
 
 }
 
