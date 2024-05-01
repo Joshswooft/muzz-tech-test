@@ -17,15 +17,29 @@ import (
 )
 
 type profile struct {
-	ID             int     `json:"id"`
-	Name           string  `json:"name"`
-	Gender         string  `json:"gender"`
-	Age            int     `json:"age"`
+	ID     int    `json:"id"`
+	Name   string `json:"name"`
+	Gender string `json:"gender"`
+	// Age in years
+	Age int `json:"age"`
+	// distance from me in km
 	DistanceFromMe float64 `json:"distanceFromMe"`
+	// totalLikes received from other users swiping on them
+	totalLikes int
+
+	// users attractiveness is a weighted score based on distance from a user and their total likes
+	attractivenessScore float64
 }
 
+// score is based on how close the profile is to the user logged in and how many total likes they have
+func (p *profile) calculateAttractivenessScore(normalizedDistance float64, normalizedTotalLikes float64) {
+	score := ((1 - normalizedDistance) * 0.8) + (normalizedTotalLikes * 0.2)
+	p.attractivenessScore = score
+}
+
+// The JSON response for the discover handler
 type DiscoverResponse struct {
-	Results []profile `json:"results"`
+	Results []*profile `json:"results"`
 }
 
 type DiscoverHandlerDeps struct {
@@ -114,14 +128,16 @@ func getUserLocation(db *sql.DB, userID int) (*user.GeoLocation, error) {
 
 // Retrieve userProfiles from the database excluding the current user and the profiles the user has already swiped on
 // Assumes all the profiles will fit in memory!
-func getPotentialMatches(db *sql.DB, userID int, now time.Time, filters filters, userLocation user.GeoLocation) ([]profile, error) {
+func getPotentialMatches(db *sql.DB, userID int, now time.Time, filters filters, userLocation user.GeoLocation) ([]*profile, error) {
 
 	// assumes we only care about the year of the date of birth for simplicity
 	query := `
 	SELECT 
-	id, name, gender, dob, strftime('%Y', date('now')) - strftime('%Y', date(dob)) AS age, lat, lng 
-	FROM users 
-	WHERE id NOT IN (SELECT swipe_target FROM swipes WHERE swiper = ?) AND id != ?`
+	u.id, u.name, u.gender, u.dob, strftime('%Y', date('now')) - strftime('%Y', date(u.dob)) AS age, u.lat, u.lng, COUNT(s.id) AS like_count
+	FROM users u
+	LEFT JOIN swipes s ON u.id = s.swipe_target AND s.liked = 1
+	WHERE u.id NOT IN (SELECT swipe_target FROM swipes WHERE swiper = ?) AND u.id != ?
+	`
 
 	params := []interface{}{userID, userID}
 
@@ -135,18 +151,22 @@ func getPotentialMatches(db *sql.DB, userID int, now time.Time, filters filters,
 		params = append(params, filters.gender)
 	}
 
+	query += "GROUP BY u.id, u.name, u.gender, u.dob, u.lat, u.lng"
+
 	rows, err := db.Query(query, params...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var userProfiles []profile
+	var userProfiles []*profile
+	var minDistanceFromMe, maxDistanceFromMe float64
+	var minTotalLikes, maxTotalLikes int
 
 	for rows.Next() {
 		var u user.User
-		var age int
-		if err := rows.Scan(&u.ID, &u.Name, &u.Gender, &u.DOB, &age, &u.Location.Lat, &u.Location.Long); err != nil {
+		var age, totalLikes int
+		if err := rows.Scan(&u.ID, &u.Name, &u.Gender, &u.DOB, &age, &u.Location.Lat, &u.Location.Long, &totalLikes); err != nil {
 			return nil, err
 		}
 
@@ -154,14 +174,32 @@ func getPotentialMatches(db *sql.DB, userID int, now time.Time, filters filters,
 		if err != nil {
 			return userProfiles, err
 		}
+
 		distanceFromMe := haversineDistance(u.Location.Lat, u.Location.Long, userLocation.Lat, userLocation.Long)
-		userProfile := profile{ID: u.ID, Name: u.Name, Gender: u.Gender, Age: age, DistanceFromMe: distanceFromMe}
+		minDistanceFromMe = math.Min(distanceFromMe, minDistanceFromMe)
+		maxDistanceFromMe = math.Max(distanceFromMe, maxDistanceFromMe)
+
+		if totalLikes < minTotalLikes {
+			minTotalLikes = totalLikes
+		}
+
+		if totalLikes > maxTotalLikes {
+			maxTotalLikes = totalLikes
+		}
+
+		userProfile := &profile{ID: u.ID, Name: u.Name, Gender: u.Gender, Age: age, DistanceFromMe: distanceFromMe, totalLikes: totalLikes}
 		userProfiles = append(userProfiles, userProfile)
 	}
 
-	// sorts by those closest to the user
+	for _, profile := range userProfiles {
+		normalizedDistance := normalizeScore(profile.DistanceFromMe, minDistanceFromMe, maxDistanceFromMe)
+		normalizedTotalLikes := normalizeScore(float64(profile.totalLikes), float64(minTotalLikes), float64(maxTotalLikes))
+		profile.calculateAttractivenessScore(normalizedDistance, normalizedTotalLikes)
+	}
+
+	// sorts user profiles by their 'attractiveness' DESC
 	sort.Slice(userProfiles, func(i, j int) bool {
-		return userProfiles[i].DistanceFromMe < userProfiles[j].DistanceFromMe
+		return userProfiles[i].attractivenessScore > userProfiles[j].attractivenessScore
 	})
 
 	return userProfiles, nil
@@ -194,4 +232,26 @@ func haversineDistance(lat1, lon1, lat2, lon2 float64) float64 {
 // degreesToRadians converts degrees to radians
 func degreesToRadians(degrees float64) float64 {
 	return degrees * (math.Pi / 180)
+}
+
+// normalizeScore normalizes a raw score to fall within a specified range.
+// minRawScore and maxRawScore define the range of the raw scores.
+func normalizeScore(rawScore, minRawScore, maxRawScore float64) float64 {
+	// Ensure that minRawScore is not greater than maxRawScore to avoid division by zero
+	if minRawScore >= maxRawScore {
+		return 0.0
+	}
+
+	// Normalize the raw score to the range [0, 1]
+	normalizedScore := (rawScore - minRawScore) / (maxRawScore - minRawScore)
+
+	// Clamp the normalized score to the range [0, 1]
+	if normalizedScore < 0.0 {
+		return 0.0
+	}
+	if normalizedScore > 1.0 {
+		return 1.0
+	}
+
+	return normalizedScore
 }

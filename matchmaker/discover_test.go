@@ -16,7 +16,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func assertEqualProfiles(t *testing.T, expectedProfiles []profile, profiles []profile) bool {
+func assertEqualProfiles(t *testing.T, expectedProfiles []*profile, profiles []*profile) bool {
 	ok := true
 
 	if len(expectedProfiles) != len(profiles) {
@@ -27,7 +27,7 @@ func assertEqualProfiles(t *testing.T, expectedProfiles []profile, profiles []pr
 	for i, expected := range expectedProfiles {
 		profile := profiles[i]
 		if profile.ID != expected.ID || profile.Name != expected.Name ||
-			profile.Gender != expected.Gender || profile.Age != expected.Age || profile.DistanceFromMe != expected.DistanceFromMe {
+			profile.Gender != expected.Gender || profile.Age != expected.Age || profile.DistanceFromMe != expected.DistanceFromMe || profile.attractivenessScore != expected.attractivenessScore {
 			t.Errorf("Unexpected user profile. Expected: %+v, Got: %+v", expected, profile)
 			ok = false
 		}
@@ -80,7 +80,7 @@ func TestDiscoverHandler(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedUserProfiles := []profile{
+	expectedUserProfiles := []*profile{
 		{ID: 3, Name: "Charlie", Gender: "male", Age: 29},
 		{ID: 4, Name: "Darren", Gender: "male", Age: 23},
 	}
@@ -133,10 +133,74 @@ func TestDiscoverHandlerSortByDistance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedUserProfiles := []profile{
+	expectedUserProfiles := []*profile{
 		{ID: 2, Name: "Jane Smith", Gender: "female", Age: 31, DistanceFromMe: 89.48927940866334},
 		{ID: 3, Name: "Alice Johnson", Gender: "female", Age: 38, DistanceFromMe: 5570.222179737958},
 		{ID: 4, Name: "Bob Williams", Gender: "male", Age: 36, DistanceFromMe: 5837.240903825839},
+	}
+
+	assertEqualProfiles(t, expectedUserProfiles, response.Results)
+
+}
+
+func TestDiscoverHandlerSortByAttractiveness(t *testing.T) {
+	db, err := sql.Open("sqlite3", "./test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	defer os.Remove("./test.db")
+
+	if _, err := db.Exec(store.SchemaSQL); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := db.Exec(`
+	INSERT INTO users (name, gender, dob, lat, lng) VALUES
+    ('John Doe', 'male', '1990-05-15', 0, 0),
+    ('Jane Smith', 'female', '1992-08-20', 2, 1),
+    ('Alice Johnson', 'female', '1985-12-10', 2, 1),
+    ('Bob Williams', 'male', '1988-03-25', 3, 3),
+	('Luke', 'male', '1988-03-25', -3, -3);
+
+	INSERT INTO swipes (swiper, swipe_target, liked) VALUES 
+	(2, 1, TRUE),
+	(2, 3, TRUE),
+	(4, 3, TRUE),
+	(4, 5, TRUE),
+	(2, 5, TRUE),
+	(3, 4, TRUE);
+	`); err != nil {
+		t.Fatal("failed to setup db", err)
+	}
+
+	ctx := middleware.SetClaimsOnContext(context.Background(), auth.JWTClaims{UserID: 1})
+	now := time.Date(2024, 04, 01, 0, 0, 0, 0, time.Local)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", "/discover", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(DiscoverHandler(DiscoverHandlerDeps{clock: func() time.Time { return now }, DB: db}))
+	handler.ServeHTTP(rr, req)
+
+	wantStatusCode := http.StatusOK
+	if rr.Code != wantStatusCode {
+		t.Fatalf("Expected status code %d, got %d", wantStatusCode, rr.Code)
+	}
+
+	var response DiscoverResponse
+	if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedUserProfiles := []*profile{
+		{ID: 3, Name: "Alice Johnson", Gender: "female", Age: 38, DistanceFromMe: 248.62931484681246},
+		{ID: 2, Name: "Jane Smith", Gender: "female", Age: 31, DistanceFromMe: 248.62931484681246},
+		{ID: 5, Name: "Luke", Gender: "male", Age: 36, DistanceFromMe: 471.65228849900205},
+		{ID: 4, Name: "Bob Williams", Gender: "male", Age: 36, DistanceFromMe: 471.65228849900205},
 	}
 
 	assertEqualProfiles(t, expectedUserProfiles, response.Results)
@@ -180,7 +244,7 @@ func TestDiscoverHandlerFilters(t *testing.T) {
 			name:    "filter by age",
 			reqBody: "/discover?age=29",
 			expectedResponse: DiscoverResponse{
-				Results: []profile{
+				Results: []*profile{
 					{ID: 3, Name: "Charlie", Gender: "male", Age: 29},
 				},
 			},
@@ -189,14 +253,14 @@ func TestDiscoverHandlerFilters(t *testing.T) {
 			name:    "filter by gender",
 			reqBody: "/discover?gender=female",
 			expectedResponse: DiscoverResponse{
-				Results: []profile{{ID: 6, Name: "Fran", Gender: "female", Age: 44}},
+				Results: []*profile{{ID: 6, Name: "Fran", Gender: "female", Age: 44}},
 			},
 		},
 		{
 			name:    "filter by age and gender",
 			reqBody: "/discover?age=24&gender=male",
 			expectedResponse: DiscoverResponse{
-				Results: []profile{
+				Results: []*profile{
 					{ID: 4, Name: "Darren", Gender: "male", Age: 23},
 				},
 			},
