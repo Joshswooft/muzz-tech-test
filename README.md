@@ -1,10 +1,24 @@
 # Muzz tech test
 
+Some notes about the technical test.
+
+- I've tried to keep things as simple as possible (KISS)
+- I've assumed some common security practices for storing passwords
+- I've assumed token meant a JWT token and I just chose a signing alg that I wanted to use
+- No extra abstractions
+- The database chosen here is sqlite - Purely for fun! I know it's not the most advanced nor practical database for running in production particularly for this type of problem
+- No ORMs and general lack of 3rd party library usage. I've done this mainly so you can see my experience at using golang but also my knowledge with SQL. In the real world there is alot of choice between ORM's and type safe query builders.
+- Testing has been [done without mocks](https://aran.dev/posts/you-probably-dont-need-to-mock/)! Personally I'm not a fan of mocks, it's extra code to maintain and forces you to make assumptions on the usage and how the underlying code works. With databases this can be particularly tricky. Luckily sqlite is just a file/inmemory
+so its very easy to test against. Similarily I've used the `httptest` library which creates an in memory server to test against.
+- Lastly using the newest net/http router, this is my first time playing with it. I'm not sure if it covers all the usecases to fully replace something like gin, fiber, echo etc.
+
+Thanks for reading, and looking forward to your feedback!
+
 ## Pre-requisites
 
 - Latest golang and docker installed.
 - `Makefile` for executing commands.
-- [`atlas`](https://atlasgo.io/getting-started/) for migrations
+- [`atlas`](https://atlasgo.io/getting-started/) for migrations (dev usage only)
 - gcc compiler (required for compiling the go-sqlite3 library)
 
 ## Running the application from docker
