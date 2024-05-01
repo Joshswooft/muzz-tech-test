@@ -16,6 +16,25 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+func assertEqualProfiles(t *testing.T, expectedProfiles []profile, profiles []profile) bool {
+	ok := true
+
+	if len(expectedProfiles) != len(profiles) {
+		t.Errorf("Expected %d users, got %d", len(expectedProfiles), len(profiles))
+		return false
+	}
+
+	for i, expected := range expectedProfiles {
+		profile := profiles[i]
+		if profile.ID != expected.ID || profile.Name != expected.Name ||
+			profile.Gender != expected.Gender || profile.Age != expected.Age || profile.DistanceFromMe != expected.DistanceFromMe {
+			t.Errorf("Unexpected user profile. Expected: %+v, Got: %+v", expected, profile)
+			ok = false
+		}
+	}
+	return ok
+}
+
 func TestDiscoverHandler(t *testing.T) {
 	db, err := sql.Open("sqlite3", "./discover-test.db")
 	if err != nil {
@@ -66,15 +85,7 @@ func TestDiscoverHandler(t *testing.T) {
 		{ID: 4, Name: "Darren", Gender: "male", Age: 23},
 	}
 
-	if len(response.Results) != len(expectedUserProfiles) {
-		t.Errorf("Expected %d users, got %d", len(expectedUserProfiles), len(response.Results))
-	}
-	for i, expected := range expectedUserProfiles {
-		if response.Results[i].ID != expected.ID || response.Results[i].Name != expected.Name ||
-			response.Results[i].Gender != expected.Gender || response.Results[i].Age != expected.Age {
-			t.Errorf("Unexpected user profile. Expected: %+v, Got: %+v", expected, response.Results[i])
-		}
-	}
+	assertEqualProfiles(t, expectedUserProfiles, response.Results)
 
 }
 
@@ -93,7 +104,7 @@ func TestDiscoverHandlerSortByDistance(t *testing.T) {
 	if _, err := db.Exec(`
 	INSERT INTO users (name, gender, dob, lat, lng) VALUES
     ('John Doe', 'male', '1990-05-15', 40.7128, -74.0060),
-    ('Jane Smith', 'female', '1992-08-20', NULL, NULL),
+    ('Jane Smith', 'female', '1992-08-20', 41, -75),
     ('Alice Johnson', 'female', '1985-12-10', 51.5074, -0.1278),
     ('Bob Williams', 'male', '1988-03-25', 48.8566, 2.3522);
 	`); err != nil {
@@ -123,20 +134,12 @@ func TestDiscoverHandlerSortByDistance(t *testing.T) {
 	}
 
 	expectedUserProfiles := []profile{
-		{ID: 2, Name: "Jane Smith", Gender: "female", Age: 31, DistanceFromMe: 0},
-		{ID: 3, Name: "Alice Johnson", Gender: "female", Age: 38},
-		{ID: 4, Name: "Bob Williams", Gender: "male", Age: 36, DistanceFromMe: 5837.24090382583},
+		{ID: 2, Name: "Jane Smith", Gender: "female", Age: 31, DistanceFromMe: 89.48927940866334},
+		{ID: 3, Name: "Alice Johnson", Gender: "female", Age: 38, DistanceFromMe: 5570.222179737958},
+		{ID: 4, Name: "Bob Williams", Gender: "male", Age: 36, DistanceFromMe: 5837.240903825839},
 	}
 
-	if len(response.Results) != len(expectedUserProfiles) {
-		t.Errorf("Expected %d users, got %d", len(expectedUserProfiles), len(response.Results))
-	}
-	for i, expected := range expectedUserProfiles {
-		if response.Results[i].ID != expected.ID || response.Results[i].Name != expected.Name ||
-			response.Results[i].Gender != expected.Gender || response.Results[i].Age != expected.Age {
-			t.Errorf("Unexpected user profile. Expected: %+v, Got: %+v", expected, response.Results[i])
-		}
-	}
+	assertEqualProfiles(t, expectedUserProfiles, response.Results)
 
 }
 
@@ -223,15 +226,8 @@ func TestDiscoverHandlerFilters(t *testing.T) {
 
 			expectedUserProfiles := tt.expectedResponse.Results
 
-			if len(response.Results) != len(expectedUserProfiles) {
-				t.Fatalf("Expected %d users, got %d", len(expectedUserProfiles), len(response.Results))
-			}
-			for i, expected := range expectedUserProfiles {
-				if response.Results[i].ID != expected.ID || response.Results[i].Name != expected.Name ||
-					response.Results[i].Gender != expected.Gender || response.Results[i].Age != expected.Age {
-					t.Errorf("Unexpected user profile. Expected: %+v, Got: %+v", expected, response.Results[i])
-				}
-			}
+			assertEqualProfiles(t, expectedUserProfiles, response.Results)
+
 		})
 	}
 

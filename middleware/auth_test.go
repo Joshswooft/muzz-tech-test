@@ -123,7 +123,6 @@ func TestSetClaimsOnContext(t *testing.T) {
 		args       args
 		wantClaims auth.JWTClaims
 	}{
-		// TODO: Add test cases.
 		{
 			name:       "no claims being set",
 			args:       args{ctx: context.Background()},

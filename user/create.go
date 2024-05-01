@@ -25,8 +25,8 @@ type User struct {
 }
 
 type GeoLocation struct {
-	Lat  sql.NullFloat64
-	Long sql.NullFloat64
+	Lat  float64
+	Long float64
 }
 
 // createUserResult is the data returned to the client upon successful creation of the user
@@ -124,8 +124,8 @@ func generateRandomUser() User {
 		Gender:   faker.Gender(),
 		DOB:      faker.Date(),
 		Location: GeoLocation{
-			Lat:  sql.NullFloat64{Float64: faker.Latitude(), Valid: true},
-			Long: sql.NullFloat64{Float64: faker.Longitude(), Valid: true},
+			Lat:  faker.Latitude(),
+			Long: faker.Longitude(),
 		},
 	}
 

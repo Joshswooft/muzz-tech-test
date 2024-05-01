@@ -101,7 +101,7 @@ type filters struct {
 }
 
 func getUserLocation(db *sql.DB, userID int) (*user.GeoLocation, error) {
-	var lat, lng sql.NullFloat64
+	var lat, lng float64
 	err := db.QueryRow("SELECT lat, lng FROM users WHERE id = ?", userID).Scan(&lat, &lng)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -146,7 +146,6 @@ func getPotentialMatches(db *sql.DB, userID int, now time.Time, filters filters,
 	for rows.Next() {
 		var u user.User
 		var age int
-		// TODO: fix why it wont scan in u.Location.Lat and long
 		if err := rows.Scan(&u.ID, &u.Name, &u.Gender, &u.DOB, &age, &u.Location.Lat, &u.Location.Long); err != nil {
 			return nil, err
 		}
@@ -155,14 +154,12 @@ func getPotentialMatches(db *sql.DB, userID int, now time.Time, filters filters,
 		if err != nil {
 			return userProfiles, err
 		}
-		distanceFromMe := 0.0
-		if u.Location.Lat.Valid && u.Location.Long.Valid && userLocation.Lat.Valid && userLocation.Long.Valid {
-			distanceFromMe = haversineDistance(u.Location.Lat.Float64, u.Location.Long.Float64, userLocation.Lat.Float64, userLocation.Long.Float64)
-		}
+		distanceFromMe := haversineDistance(u.Location.Lat, u.Location.Long, userLocation.Lat, userLocation.Long)
 		userProfile := profile{ID: u.ID, Name: u.Name, Gender: u.Gender, Age: age, DistanceFromMe: distanceFromMe}
 		userProfiles = append(userProfiles, userProfile)
 	}
 
+	// sorts by those closest to the user
 	sort.Slice(userProfiles, func(i, j int) bool {
 		return userProfiles[i].DistanceFromMe < userProfiles[j].DistanceFromMe
 	})
