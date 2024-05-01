@@ -5,6 +5,20 @@
 - Latest golang and docker installed.
 - `Makefile` for executing commands.
 - [`atlas`](https://atlasgo.io/getting-started/) for migrations
+- gcc compiler (required for compiling the go-sqlite3 library)
+
+## Running the application from docker
+
+### Build the docker image
+```bash
+docker build -t muzz-app .
+```
+
+### Run the docker application
+
+```bash
+docker run -p 8080:8080 muzz-app
+```
 
 ## Run application
 

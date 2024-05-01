@@ -1,0 +1,31 @@
+# Exclude version control system files
+.git
+.gitignore
+
+# Exclude binary and intermediate files
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.prof
+*.tar.gz
+*.log
+*.log.*
+*.out
+*.pid
+
+# Exclude editor and IDE files
+.vscode
+.idea
+
+# Exclude build-related directories
+bin/
+vendor/
+
+# Exclude Docker-related files
+.dockerignore
+Dockerfile
+
+# Exclude any other files or directories specific to your project
